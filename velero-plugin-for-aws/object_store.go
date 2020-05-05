@@ -19,7 +19,6 @@ package main
 import (
 	"crypto/tls"
 	"io"
-	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -146,23 +145,8 @@ func (o *ObjectStore) Init(config map[string]string) error {
 
 	if insecureSkipTLSVerify {
 		serverConfig.HTTPClient = &http.Client{
-			// Copied from net/http
 			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 30 * time.Second,
-					DualStack: true,
-				}).DialContext,
-				MaxIdleConns:          100,
-				MaxIdleConnsPerHost:   100,
-				IdleConnTimeout:       90 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-				// Set insecureSkipVerify true
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
 	}
