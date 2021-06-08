@@ -54,6 +54,11 @@ func (m *mockS3) ListObjectsV2Pages(input *s3.ListObjectsV2Input, fn func(*s3.Li
 	return args.Error(0)
 }
 
+func (m *mockS3) ListObjectsPages(input *s3.ListObjectsInput, fn func(*s3.ListObjectsOutput, bool) bool) error {
+	args := m.Called(input, fn)
+	return args.Error(0)
+}
+
 func (m *mockS3) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
 	args := m.Called(input)
 	return args.Get(0).(*s3.DeleteObjectOutput), args.Error(1)
