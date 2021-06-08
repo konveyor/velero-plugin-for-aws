@@ -58,6 +58,7 @@ type s3Interface interface {
 	HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error)
 	GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error)
 	ListObjectsV2Pages(input *s3.ListObjectsV2Input, fn func(*s3.ListObjectsV2Output, bool) bool) error
+	ListObjectsPages(input *s3.ListObjectsInput, fn func(page *s3.ListObjectsOutput, lastPage bool) bool) error
 	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 	GetObjectRequest(input *s3.GetObjectInput) (req *request.Request, output *s3.GetObjectOutput)
 }
@@ -344,21 +345,57 @@ func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 }
 
 func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+	log := o.log.WithFields(
+		logrus.Fields{
+			"bucket":    bucket,
+			"prefix":    prefix,
+			"delimiter": delimiter,
+		},
+	)
+
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Prefix:    &prefix,
 		Delimiter: &delimiter,
 	}
 
+	tryListV1 := false
 	var ret []string
 	err := o.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
 		for _, prefix := range page.CommonPrefixes {
 			ret = append(ret, *prefix.Prefix)
 		}
+		if *page.IsTruncated && page.NextContinuationToken == nil {
+			tryListV1 = true
+			// we force a return as soon as invalid API found
+			log.Debugf("the page is truncated but nextContinuationToken is not present, trying ListObjects API")
+			return false
+		}
 		return !lastPage
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	if tryListV1 {
+		// lets try the above all over again for ListV1
+		log.Info("listing prefixes with ListObjects API")
+		reqV1 := &s3.ListObjectsInput{
+			Bucket:    &bucket,
+			Prefix:    &prefix,
+			Delimiter: &delimiter,
+		}
+
+		ret = []string{}
+		err := o.s3.ListObjectsPages(reqV1, func(page *s3.ListObjectsOutput, lastPage bool) bool {
+			for _, prefix := range page.CommonPrefixes {
+				ret = append(ret, *prefix.Prefix)
+			}
+			return !lastPage
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
 	}
 
 	return ret, nil
