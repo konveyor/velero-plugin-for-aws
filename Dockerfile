@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.13-buster AS build
+FROM registry.access.redhat.com/ubi8/go-toolset:1.14.7 AS build
 COPY . /go/src/velero-plugin-for-aws
 WORKDIR /go/src/velero-plugin-for-aws
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-aws ./velero-plugin-for-aws
